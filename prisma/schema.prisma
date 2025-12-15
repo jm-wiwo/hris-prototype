@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  HR
+  EMPLOYEE
+}
+
+enum LeaveType {
+  EMERGENCY
+  SICK
+  VACATION
+  OVERTIME
+  OFFSET
+  ABSENT
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+  HALF_DAY
+}
+
+enum PayrollStatus {
+  DRAFT
+  PROCESSED
+  PAID
+}
+
+model Organization {
+  id          String       @id @default(cuid())
+  name        String
+  address     String?
+  logo        String?
+  settings    Json         @default("{}")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  departments Department[]
+  employees   Employee[]
+}
+
+model Department {
+  id             String       @id @default(cuid())
+  name           String
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  managerId      String?
+  positions      Position[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model Position {
+  id           String     @id @default(cuid())
+  title        String
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  baseSalary   Float
+  employees    Employee[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model Employee {
+  id               String        @id @default(cuid())
+  email            String        @unique
+  password         String
+  firstName        String
+  lastName         String
+  phone            String?
+  address          String?
+  role             Role          @default(EMPLOYEE)
+  positionId       String?
+  position         Position?     @relation(fields: [positionId], references: [id])
+  organizationId   String?
+  organization     Organization? @relation(fields: [organizationId], references: [id])
+  hireDate         DateTime      @default(now())
+  isActive         Boolean       @default(true)
+  twoFactorSecret  String?
+  twoFactorEnabled Boolean       @default(false)
+  avatar           String?
+  leaves           Leave[]       @relation("EmployeeLeaves")
+  approvedLeaves   Leave[]       @relation("ApprovedLeaves")
+  attendances      Attendance[]
+  payrolls         Payroll[]
+  documents        Document[]
+  announcements    Announcement[]
+  auditLogs        AuditLog[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+}
+
+model Leave {
+  id           String      @id @default(cuid())
+  employeeId   String
+  employee     Employee    @relation("EmployeeLeaves", fields: [employeeId], references: [id])
+  type         LeaveType
+  dateFrom     DateTime
+  dateTo       DateTime
+  purpose      String
+  status       LeaveStatus @default(PENDING)
+  signature    String?
+  approvedById String?
+  approvedBy   Employee?   @relation("ApprovedLeaves", fields: [approvedById], references: [id])
+  approvedAt   DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+model Attendance {
+  id         String           @id @default(cuid())
+  employeeId String
+  employee   Employee         @relation(fields: [employeeId], references: [id])
+  date       DateTime
+  timeIn     DateTime?
+  timeOut    DateTime?
+  status     AttendanceStatus @default(PRESENT)
+  notes      String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@unique([employeeId, date])
+}
+
+model Payroll {
+  id            String        @id @default(cuid())
+  employeeId    String
+  employee      Employee      @relation(fields: [employeeId], references: [id])
+  periodStart   DateTime
+  periodEnd     DateTime
+  basePay       Float
+  overtimePay   Float         @default(0)
+  deductions    Float         @default(0)
+  absentDays    Int           @default(0)
+  absentDeduction Float       @default(0)
+  netPay        Float
+  status        PayrollStatus @default(DRAFT)
+  paidAt        DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Document {
+  id         String   @id @default(cuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  type       String
+  filename   String
+  url        String
+  createdAt  DateTime @default(now())
+}
+
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  authorId  String
+  author    Employee @relation(fields: [authorId], references: [id])
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      Employee @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String?
+  changes   Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+}
